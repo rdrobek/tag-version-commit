@@ -36,15 +36,15 @@ export async function run(): Promise<void> {
     // Check if its title matches the version regex
     const commit_message = commit.data.message.split('\n');
     const commit_title = commit_message[0];
-    const version_regex_match = regex.test(commit_title);
-    if (!version_regex_match) {
+    const version_regex_match = commit_title.match(regex);
+    if (!version_regex_match || !version_regex_match[1]) {
       info(`Commit title does not match version regex '${version_regex}': '${commit_title}'`);
       setOutput('tag', '');
       setOutput('message', '');
       setOutput('commit', '');
       return;
     }
-    const version = commit_title;
+    const version = version_regex_match[1];
 
     // Run version assertion command if one was provided
     if (version_assertion_command.length > 0) {

@@ -7,7 +7,7 @@ beforeEach(() => {
 
   // Reset action inputs environment variables to their default value,
   // otherwise an environment variable set in a test can creep into a later test
-  process.env['INPUT_VERSION_REGEX'] = '^[0-9]+\\.[0-9]+\\.[0-9]+$';
+  process.env['INPUT_VERSION_REGEX'] = '([0-9]+\\.[0-9]+\\.[0-9]+)';
   process.env['INPUT_VERSION_TAG_PREFIX'] = '';
   process.env['INPUT_VERSION_ASSERTION_COMMAND'] = '';
   process.env['INPUT_ANNOTATED'] = 'false';
@@ -62,7 +62,8 @@ describe('action', () => {
     expect(stdout_write).toHaveBeenCalledWith(expect.stringMatching(/^.*name=commit::[\n]*$/));
   });
 
-  it('works correctly with the default version regex: version in a sentence', async () => {
+  it('works correctly with a restrictive version regex: version in a sentence', async () => {
+    process.env['INPUT_VERSION_REGEX'] = '^([0-9]+\\.[0-9]+\\.[0-9]+)$';
     nock('https://api.github.com')
       .get('/repos/theowner/therepo/git/commits/0123456789abcdef')
       .reply(200, {
@@ -76,6 +77,27 @@ describe('action', () => {
     // Outputs should be empty
     expect(stdout_write).toHaveBeenCalledWith(expect.stringMatching(/^.*name=tag::[\n]*$/));
     expect(stdout_write).toHaveBeenCalledWith(expect.stringMatching(/^.*name=commit::[\n]*$/));
+  });
+
+  it('works correctly with the default version regex: version in a sentence', async () => {
+    nock('https://api.github.com')
+      .get('/repos/theowner/therepo/git/commits/0123456789abcdef')
+      .reply(200, {
+        message: 'this commit title contains a 8.9.1 version'
+      });
+    nock('https://api.github.com')
+      .post('/repos/theowner/therepo/git/refs', {ref: 'refs/tags/8.9.1', sha: '0123456789abcdef'})
+      .reply(201, {});
+
+    const stdout_write = jest.spyOn(process.stdout, 'write');
+
+    await run();
+
+    // Outputs should be empty
+    expect(stdout_write).toHaveBeenCalledWith(expect.stringContaining('name=tag::8.9.1'));
+    expect(stdout_write).toHaveBeenCalledWith(
+      expect.stringContaining('name=commit::0123456789abcdef')
+    );
   });
 
   it('works correctly with the default version regex: version that could match a misformed regex', async () => {
@@ -99,7 +121,7 @@ describe('action', () => {
     nock('https://api.github.com')
       .get('/repos/theowner/therepo/git/commits/0123456789abcdef')
       .reply(200, {
-        message: '1.2.3'
+        message: 'v1.2.3'
       });
     nock('https://api.github.com')
       .post('/repos/theowner/therepo/git/refs', {ref: 'refs/tags/1.2.3', sha: '0123456789abcdef'})
@@ -116,7 +138,7 @@ describe('action', () => {
   });
 
   it('works with a non-default version regex', async () => {
-    process.env['INPUT_VERSION_REGEX'] = '[0-9]+.[0-9]+.[a-z]+';
+    process.env['INPUT_VERSION_REGEX'] = '([0-9]+.[0-9]+.[a-z]+)';
 
     nock('https://api.github.com')
       .get('/repos/theowner/therepo/git/commits/0123456789abcdef')
