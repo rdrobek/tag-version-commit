@@ -34,7 +34,7 @@ export async function run(): Promise<void> {
     }
 
     // Check if its title matches the version regex
-    // const commit_message = commit.data.message.split('\n');
+    const commit_message = commit.data.message.split('\n');
     // ** parse entire commit message
     const commit_title = commit.data.message;
     const version_regex_match = commit_title.match(regex);
