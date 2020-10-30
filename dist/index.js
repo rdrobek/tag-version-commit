@@ -2974,8 +2974,8 @@ function run() {
                 return;
             }
             // Check if its title matches the version regex
-            const commit_message = commit.data.message.split('\n');
-            const commit_title = commit_message[0];
+            // const commit_message = commit.data.message.split('\n');
+            const commit_title = commit.data.message;
             const version_regex_match = commit_title.match(regex);
             if (!version_regex_match || !version_regex_match[1]) {
                 core_1.info(`Commit title does not match version regex '${version_regex}': '${commit_title}'`);
