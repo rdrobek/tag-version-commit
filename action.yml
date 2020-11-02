@@ -41,6 +41,16 @@ inputs:
       Do everything except actually create the tag.
     required: false
     default: false
+  release:
+    description: |
+     Create release insted of simple tag
+    required: false
+    default: false
+  releaseName:
+    description: |
+     Release prefix name
+    required: false
+    default: 'Release'
 
 runs:
   using: 'node12'
