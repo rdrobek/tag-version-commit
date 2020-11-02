@@ -11,6 +11,8 @@ export async function run(): Promise<void> {
     const version_tag_prefix = getInput('version_tag_prefix');
     const annotated = getInput('annotated') === 'true';
     const dry_run = getInput('dry_run') === 'true';
+    const release = getInput('release') === 'true';
+    const releaseName = getInput('releaseName', { required: false }) || 'Release';
 
     // Validate regex (will throw if invalid)
     const regex = new RegExp(version_regex);
@@ -79,6 +81,7 @@ export async function run(): Promise<void> {
 
     if (!dry_run) {
       // Let the GitHub API return an error if they already exist
+     if (!release) { 
       if (annotated) {
         const tag_response = await octokit.git.createTag({
           owner: repo_owner,
@@ -103,6 +106,31 @@ export async function run(): Promise<void> {
         setFailed(`Failed to create tag ref (status=${ref_response.status})`);
         return;
       }
+     } else {
+        // Create a release
+        // API Documentation: https://developer.github.com/v3/repos/releases/#create-a-release
+        // Octokit Documentation: https://octokit.github.io/rest.js/#octokit-routes-repos-create-release
+        const createReleaseResponse = await octokit.repos.createRelease({
+         repo_owner,
+         repo_name,
+         tag_name,
+         name: releaseName + ' ' + tag_name,
+         body: bodyFileContent || body,
+         false,
+         false,
+         target_commitish: commit_sha
+        });
+
+       // Get the ID, html_url, and upload URL for the created Release from the response
+       const {
+        data: { id: releaseId, html_url: htmlUrl, upload_url: uploadUrl }
+        } = createReleaseResponse;
+
+       // Set the output variables for use by other actions: https://github.com/actions/toolkit/tree/master/packages/core#inputsoutputs
+       core.setOutput('id', releaseId);
+       core.setOutput('html_url', htmlUrl);
+       core.setOutput('upload_url', uploadUrl);
+     }
     }
 
     info(
