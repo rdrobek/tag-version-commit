@@ -111,15 +111,20 @@ export async function run(): Promise<void> {
         // API Documentation: https://developer.github.com/v3/repos/releases/#create-a-release
         // Octokit Documentation: https://octokit.github.io/rest.js/#octokit-routes-repos-create-release
         const createReleaseResponse = await octokit.repos.createRelease({
-         repo_owner,
-         repo_name,
-         tag_name,
+         owner: repo_owner,
+         repo: repo_name,
+         tag_name: tag_name,
          name: releaseName + ' ' + tag_name,
-         body: bodyFileContent || body,
-         false,
-         false,
+         body: '',
+         draft: false,
+         prerelease: false,
          target_commitish: commit_sha
         });
+  
+        if (201 !== createReleaseResponse.status) {
+          setFailed(`Failed to create release (status=${createReleaseResponse.status})`);
+          return;
+        }
 
        // Get the ID, html_url, and upload URL for the created Release from the response
        const {
@@ -127,9 +132,9 @@ export async function run(): Promise<void> {
         } = createReleaseResponse;
 
        // Set the output variables for use by other actions: https://github.com/actions/toolkit/tree/master/packages/core#inputsoutputs
-       core.setOutput('id', releaseId);
-       core.setOutput('html_url', htmlUrl);
-       core.setOutput('upload_url', uploadUrl);
+       setOutput('id', releaseId);
+       setOutput('html_url', htmlUrl);
+       setOutput('upload_url', uploadUrl);
      }
     }
 

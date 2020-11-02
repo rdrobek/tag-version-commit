@@ -2897,6 +2897,8 @@ function run() {
             const version_tag_prefix = core_1.getInput('version_tag_prefix');
             const annotated = core_1.getInput('annotated') === 'true';
             const dry_run = core_1.getInput('dry_run') === 'true';
+            const release = core_1.getInput('release') === 'true';
+            const releaseName = core_1.getInput('releaseName', { required: false }) || 'Release';
             // Validate regex (will throw if invalid)
             const regex = new RegExp(version_regex);
             // Get data from context
@@ -2952,29 +2954,56 @@ function run() {
             core_1.debug(`Creating tag '${tag_name}' on commit ${commit_sha}${annotated ? ` with message: '${tag_message}'` : ''}`);
             if (!dry_run) {
                 // Let the GitHub API return an error if they already exist
-                if (annotated) {
-                    const tag_response = yield octokit.git.createTag({
+                if (!release) {
+                    if (annotated) {
+                        const tag_response = yield octokit.git.createTag({
+                            owner: repo_owner,
+                            repo: repo_name,
+                            tag: tag_name,
+                            message: tag_message,
+                            object: commit_sha,
+                            type: 'commit'
+                        });
+                        if (201 !== tag_response.status) {
+                            core_1.setFailed(`Failed to create tag object (status=${tag_response.status})`);
+                            return;
+                        }
+                    }
+                    const ref_response = yield octokit.git.createRef({
                         owner: repo_owner,
                         repo: repo_name,
-                        tag: tag_name,
-                        message: tag_message,
-                        object: commit_sha,
-                        type: 'commit'
+                        ref: `refs/tags/${tag_name}`,
+                        sha: commit_sha
                     });
-                    if (201 !== tag_response.status) {
-                        core_1.setFailed(`Failed to create tag object (status=${tag_response.status})`);
+                    if (201 !== ref_response.status) {
+                        core_1.setFailed(`Failed to create tag ref (status=${ref_response.status})`);
                         return;
                     }
                 }
-                const ref_response = yield octokit.git.createRef({
-                    owner: repo_owner,
-                    repo: repo_name,
-                    ref: `refs/tags/${tag_name}`,
-                    sha: commit_sha
-                });
-                if (201 !== ref_response.status) {
-                    core_1.setFailed(`Failed to create tag ref (status=${ref_response.status})`);
-                    return;
+                else {
+                    // Create a release
+                    // API Documentation: https://developer.github.com/v3/repos/releases/#create-a-release
+                    // Octokit Documentation: https://octokit.github.io/rest.js/#octokit-routes-repos-create-release
+                    const createReleaseResponse = yield octokit.repos.createRelease({
+                        owner: repo_owner,
+                        repo: repo_name,
+                        tag_name: tag_name,
+                        name: releaseName + ' ' + tag_name,
+                        body: '',
+                        draft: false,
+                        prerelease: false,
+                        target_commitish: commit_sha
+                    });
+                    if (201 !== createReleaseResponse.status) {
+                        core_1.setFailed(`Failed to create release (status=${createReleaseResponse.status})`);
+                        return;
+                    }
+                    // Get the ID, html_url, and upload URL for the created Release from the response
+                    const { data: { id: releaseId, html_url: htmlUrl, upload_url: uploadUrl } } = createReleaseResponse;
+                    // Set the output variables for use by other actions: https://github.com/actions/toolkit/tree/master/packages/core#inputsoutputs
+                    core_1.setOutput('id', releaseId);
+                    core_1.setOutput('html_url', htmlUrl);
+                    core_1.setOutput('upload_url', uploadUrl);
                 }
             }
             core_1.info(`Created tag '${tag_name}' on commit ${commit_sha}${annotated
